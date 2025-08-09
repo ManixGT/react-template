@@ -1,40 +1,51 @@
-// InfiniteScroll.jsx
-import { useState, useEffect, useRef } from 'react';
+// VirtualizedInfiniteScroll.jsx
+import { useState, useRef, useEffect } from 'react';
 
-export default function Virtualised() {
-  const [items, setItems] = useState([]);
-  const loaderRef = useRef(null);
+export default function VirtualizedInfiniteScroll() {
+  const [items, setItems] = useState(Array.from({ length: 50 }, (_, i) => i + 1));
+  const containerRef = useRef(null);
+  const itemHeight = 40; // px
+  const buffer = 5; // extra items above/below
 
-  // Append new items
-  const fetchItems = () => {
-    setItems(prev => [
-      ...prev,
-      ...Array.from({ length: 10 }, (_, i) => prev.length + i + 1)
-    ]);
-  };
+  const [scrollTop, setScrollTop] = useState(0);
+  const visibleCount = Math.ceil(window.innerHeight / itemHeight) + buffer * 2;
 
-  // Load initial items
+  // Scroll listener
   useEffect(() => {
-    fetchItems();
+    const el = containerRef.current;
+    const onScroll = () => {
+      setScrollTop(el.scrollTop);
+      // Load more if near bottom
+      if (el.scrollTop + el.clientHeight >= el.scrollHeight - 50) {
+        setItems(prev => [...prev, ...Array.from({ length: 20 }, (_, i) => prev.length + i + 1)]);
+      }
+    };
+    el.addEventListener('scroll', onScroll);
+    return () => el.removeEventListener('scroll', onScroll);
   }, []);
 
-  // IntersectionObserver for infinite scroll
-  useEffect(() => {
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) fetchItems();
-    });
-    if (loaderRef.current) observer.observe(loaderRef.current);
-    return () => observer.unobserve(loaderRef.current);
-  }, []);
+  // Calculate visible range
+  const startIndex = Math.max(0, Math.floor(scrollTop / itemHeight) - buffer);
+  const endIndex = Math.min(items.length, startIndex + visibleCount);
+  const offsetY = startIndex * itemHeight;
 
   return (
-    <div>
-      {items.map(item => (
-        <div key={item} style={{ padding: '8px', border: '1px solid #ccc' }}>
-          Item {item}
+    <div
+      ref={containerRef}
+      style={{ height: '100vh', overflowY: 'auto', border: '1px solid #ccc' }}
+    >
+      <div style={{ height: items.length * itemHeight, position: 'relative' }}>
+        <div style={{ transform: `translateY(${offsetY}px)` }}>
+          {items.slice(startIndex, endIndex).map(item => (
+            <div
+              key={item}
+              style={{ height: itemHeight, borderBottom: '1px solid #eee', padding: '8px' }}
+            >
+              Item {item}
+            </div>
+          ))}
         </div>
-      ))}
-      <div ref={loaderRef}>Loading...</div>
+      </div>
     </div>
   );
 }
